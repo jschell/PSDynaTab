@@ -87,13 +87,21 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jschell/PSDynaTab/main
 
 3. Copy module to PowerShell modules directory:
    ```powershell
-   Copy-Item -Recurse .\PSDynaTab "$env:USERPROFILE\Documents\PowerShell\Modules\"
+   # For PowerShell 7+
+   $modulesPath = ($env:PSModulePath -split ';' | Where-Object { $_ -like "*$env:USERPROFILE*" -and $_ -like "*PowerShell\Modules*" } | Select-Object -First 1)
+   Copy-Item -Recurse .\PSDynaTab $modulesPath
+
+   # OR use GetFolderPath (handles OneDrive redirection)
+   $documentsPath = [Environment]::GetFolderPath('MyDocuments')
+   Copy-Item -Recurse .\PSDynaTab "$documentsPath\PowerShell\Modules\"
    ```
 
 4. Import the module:
    ```powershell
    Import-Module PSDynaTab
    ```
+
+> **Note:** If your Documents folder is redirected to OneDrive, the Quick Install method (Install.ps1) automatically detects the correct path.
 
 ## Available Commands
 

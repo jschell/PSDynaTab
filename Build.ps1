@@ -39,23 +39,73 @@ Write-Host "=== PSDynaTab Build Script ===" -ForegroundColor Cyan
 if (-not (Test-Path $HidSharpDllPath)) {
     Write-Host "`nDownloading HidSharp.dll..." -ForegroundColor Yellow
 
-    $tempPath = Join-Path $env:TEMP 'hidsharp'
+    $tempPath = Join-Path $env:TEMP "hidsharp-$(Get-Date -Format 'yyyyMMddHHmmss')"
     New-Item -ItemType Directory -Force -Path $tempPath | Out-Null
 
-    # Download NuGet package
-    $nugetUrl = "https://www.nuget.org/api/v2/package/HidSharp/2.1.0"
-    $zipPath = Join-Path $tempPath 'hidsharp.zip'
+    try {
+        # Download NuGet package
+        $nugetUrl = "https://www.nuget.org/api/v2/package/HidSharp/2.1.0"
+        $zipPath = Join-Path $tempPath 'hidsharp.zip'
 
-    Invoke-WebRequest -Uri $nugetUrl -OutFile $zipPath
+        Write-Verbose "Downloading from: $nugetUrl"
+        Invoke-WebRequest -Uri $nugetUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 30
 
-    # Extract
-    Expand-Archive -Path $zipPath -DestinationPath $tempPath -Force
+        # Extract
+        Write-Verbose "Extracting to: $tempPath"
+        Expand-Archive -Path $zipPath -DestinationPath $tempPath -Force
 
-    # Copy DLL
-    New-Item -ItemType Directory -Force -Path $LibPath | Out-Null
-    Copy-Item "$tempPath\lib\netstandard2.0\HidSharp.dll" -Destination $HidSharpDllPath
+        # Wait for filesystem to settle (prevents access denied errors)
+        Start-Sleep -Milliseconds 500
 
-    Write-Host "✓ HidSharp.dll downloaded" -ForegroundColor Green
+        # Copy DLL with retry logic
+        New-Item -ItemType Directory -Force -Path $LibPath | Out-Null
+
+        $sourceDll = Join-Path $tempPath "lib\netstandard2.0\HidSharp.dll"
+        $retryCount = 0
+        $maxRetries = 3
+        $copySuccess = $false
+
+        while ($retryCount -lt $maxRetries -and -not $copySuccess) {
+            try {
+                if (-not (Test-Path $sourceDll)) {
+                    throw "Source DLL not found at: $sourceDll"
+                }
+
+                Write-Verbose "Copy attempt $($retryCount + 1) of $maxRetries"
+                Copy-Item -Path $sourceDll -Destination $HidSharpDllPath -Force
+                $copySuccess = $true
+
+            } catch {
+                $retryCount++
+                if ($retryCount -lt $maxRetries) {
+                    Write-Verbose "Copy failed, retrying in 500ms... ($($_.Exception.Message))"
+                    Start-Sleep -Milliseconds 500
+                } else {
+                    throw "Failed to copy HidSharp.dll after $maxRetries attempts: $($_.Exception.Message)"
+                }
+            }
+        }
+
+        # Verify DLL was copied and has reasonable size
+        if (Test-Path $HidSharpDllPath) {
+            $dllSize = (Get-Item $HidSharpDllPath).Length
+            if ($dllSize -lt 100KB) {
+                throw "HidSharp.dll size ($dllSize bytes) is too small - download may be corrupt"
+            }
+            Write-Host "✓ HidSharp.dll downloaded ($('{0:N2}' -f ($dllSize / 1KB)) KB)" -ForegroundColor Green
+        } else {
+            throw "HidSharp.dll was not found after copy operation"
+        }
+
+    } catch {
+        Write-Error "Failed to download HidSharp.dll: $($_.Exception.Message)"
+        throw
+    } finally {
+        # Cleanup temp directory
+        if (Test-Path $tempPath) {
+            Remove-Item -Path $tempPath -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 } else {
     Write-Host "`n✓ HidSharp.dll already present" -ForegroundColor Green
 }

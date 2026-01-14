@@ -71,10 +71,24 @@ if ($Scope -eq 'AllUsers') {
         throw "AllUsers scope requires administrator privileges. Please run PowerShell as Administrator or use -Scope CurrentUser"
     }
 } else {
+    # For CurrentUser, detect the correct path (handles OneDrive/folder redirection)
     if ($PSVersionTable.PSVersion.Major -ge 6) {
-        $modulesPath = "$env:USERPROFILE\Documents\PowerShell\Modules"
+        # PowerShell 7+ - check PSModulePath first (respects redirection)
+        $userModulePath = $env:PSModulePath -split ';' |
+            Where-Object { $_ -like "*$env:USERPROFILE*" -and $_ -like "*PowerShell\Modules*" } |
+            Select-Object -First 1
+
+        if ($userModulePath) {
+            $modulesPath = $userModulePath
+        } else {
+            # Fallback to GetFolderPath (respects folder redirection)
+            $documentsPath = [Environment]::GetFolderPath('MyDocuments')
+            $modulesPath = Join-Path $documentsPath "PowerShell\Modules"
+        }
     } else {
-        $modulesPath = "$env:USERPROFILE\Documents\WindowsPowerShell\Modules"
+        # PowerShell 5.1 - use GetFolderPath (respects folder redirection)
+        $documentsPath = [Environment]::GetFolderPath('MyDocuments')
+        $modulesPath = Join-Path $documentsPath "WindowsPowerShell\Modules"
     }
 }
 
@@ -140,6 +154,69 @@ try {
         Write-Warning "Build.ps1 not found. HidSharp.dll may need to be downloaded manually."
     }
 
+    # Verify HidSharp.dll exists, download directly if missing
+    $hidSharpPath = Join-Path $extractedFolder.FullName "PSDynaTab\lib\HidSharp.dll"
+    if (-not (Test-Path $hidSharpPath)) {
+        Write-Host "  HidSharp.dll not found, downloading directly..." -ForegroundColor Yellow
+
+        try {
+            $libPath = Join-Path $extractedFolder.FullName "PSDynaTab\lib"
+            New-Item -ItemType Directory -Force -Path $libPath | Out-Null
+
+            # Download HidSharp NuGet package
+            $nugetUrl = "https://www.nuget.org/api/v2/package/HidSharp/2.1.0"
+            $zipPath = Join-Path $env:TEMP "hidsharp-fallback.zip"
+
+            Invoke-WebRequest -Uri $nugetUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 30
+
+            # Extract to temp location
+            $extractPath = Join-Path $env:TEMP "hidsharp-extract"
+            if (Test-Path $extractPath) {
+                Remove-Item -Path $extractPath -Recurse -Force
+            }
+
+            Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+            Start-Sleep -Milliseconds 500  # Wait for filesystem
+
+            # Copy DLL with retry logic
+            $sourceDll = Join-Path $extractPath "lib\netstandard2.0\HidSharp.dll"
+            $retryCount = 0
+            $maxRetries = 3
+            $copySuccess = $false
+
+            while ($retryCount -lt $maxRetries -and -not $copySuccess) {
+                try {
+                    if (Test-Path $sourceDll) {
+                        Copy-Item -Path $sourceDll -Destination $hidSharpPath -Force
+                        $copySuccess = $true
+                    } else {
+                        throw "Source DLL not found at: $sourceDll"
+                    }
+                } catch {
+                    $retryCount++
+                    if ($retryCount -lt $maxRetries) {
+                        Start-Sleep -Milliseconds 500
+                    }
+                }
+            }
+
+            # Cleanup
+            Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+
+            if ($copySuccess) {
+                Write-Host "  ✓ HidSharp.dll downloaded successfully" -ForegroundColor Green
+            } else {
+                Write-Warning "Failed to download HidSharp.dll after $maxRetries attempts"
+            }
+        } catch {
+            Write-Warning "Failed to download HidSharp.dll: $($_.Exception.Message)"
+            Write-Warning "Module may not work until HidSharp.dll is manually installed"
+        }
+    } else {
+        Write-Host "  ✓ HidSharp.dll found" -ForegroundColor Green
+    }
+
     # Install module
     Write-Host "`n[5/5] Installing module..." -ForegroundColor Cyan
 
@@ -167,6 +244,19 @@ try {
     # Verify installation
     Write-Host "`nVerifying installation..." -ForegroundColor Cyan
     $manifestPath = Join-Path $moduleInstallPath "PSDynaTab.psd1"
+    $installedHidSharpPath = Join-Path $moduleInstallPath "lib\HidSharp.dll"
+
+    # Check HidSharp.dll first (critical dependency)
+    if (Test-Path $installedHidSharpPath) {
+        $dllSize = [math]::Round((Get-Item $installedHidSharpPath).Length / 1KB, 2)
+        Write-Host "  ✓ HidSharp.dll installed (${dllSize} KB)" -ForegroundColor Green
+    } else {
+        Write-Host "  ✗ HidSharp.dll missing!" -ForegroundColor Red
+        Write-Warning "Module will not work without HidSharp.dll"
+        Write-Warning "Please run Build.ps1 manually or report this issue"
+    }
+
+    # Validate module manifest
     if (Test-Path $manifestPath) {
         try {
             $manifest = Test-ModuleManifest -Path $manifestPath -ErrorAction Stop
@@ -174,6 +264,9 @@ try {
             Write-Host "  ✓ Version: $($manifest.Version)" -ForegroundColor Green
         } catch {
             Write-Warning "Module manifest validation failed: $($_.Exception.Message)"
+            if (-not (Test-Path $installedHidSharpPath)) {
+                Write-Warning "This is likely because HidSharp.dll is missing"
+            }
         }
     }
 
