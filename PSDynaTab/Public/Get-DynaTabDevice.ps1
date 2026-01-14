@@ -19,6 +19,12 @@ function Get-DynaTabDevice {
 
     if ($script:DeviceConnected -and $script:DynaTabDevice) {
         # Return connected device info
+        try {
+            $manufacturerString = $script:DynaTabDevice.GetManufacturer()
+        } catch {
+            $manufacturerString = "N/A"
+        }
+
         return [PSCustomObject]@{
             PSTypeName = 'PSDynaTab.DeviceInfo'
             Connected = $true
@@ -26,7 +32,7 @@ function Get-DynaTabDevice {
             VendorID = "0x$($script:VID.ToString('X4'))"
             ProductID = "0x$($script:PID.ToString('X4'))"
             ProductName = $script:DynaTabDevice.GetProductName()
-            ManufacturerString = try { $script:DynaTabDevice.GetManufacturer() } catch { "N/A" }
+            ManufacturerString = $manufacturerString
             ScreenSize = "${script:SCREEN_WIDTH}x${script:SCREEN_HEIGHT}"
             PixelCount = $script:PIXEL_COUNT
             InterfaceNumber = "MI_02"
@@ -42,13 +48,19 @@ function Get-DynaTabDevice {
 
         # Return info about available (but not connected) device
         $device = $devices[0]
+        try {
+            $productName = $device.GetProductName()
+        } catch {
+            $productName = "DynaTab 75X"
+        }
+
         return [PSCustomObject]@{
             PSTypeName = 'PSDynaTab.DeviceInfo'
             Connected = $false
             DevicePath = $device.DevicePath
             VendorID = "0x$($script:VID.ToString('X4'))"
             ProductID = "0x$($script:PID.ToString('X4'))"
-            ProductName = try { $device.GetProductName() } catch { "DynaTab 75X" }
+            ProductName = $productName
             InterfacesFound = $devices.Count
             Message = "Use Connect-DynaTab to establish connection"
         }
