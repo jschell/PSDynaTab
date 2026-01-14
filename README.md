@@ -41,11 +41,42 @@ Disconnect-DynaTab
 
 ## Installation
 
-### Building from Source
+### Quick Install from GitHub (Recommended)
+
+**One-line installer** (downloads and installs automatically):
+
+```powershell
+irm https://raw.githubusercontent.com/jschell/PSDynaTab/main/Install.ps1 | iex
+```
+
+Or download and run the installer:
+
+```powershell
+# Download installer
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jschell/PSDynaTab/main/Install.ps1" -OutFile "Install.ps1"
+
+# Run installer
+.\Install.ps1
+```
+
+**Installation Options:**
+
+```powershell
+# Install from specific branch
+.\Install.ps1 -Branch "claude/powershell-dynatab-module-a8B5h"
+
+# Install for all users (requires admin)
+.\Install.ps1 -Scope AllUsers
+
+# Skip tests during installation
+.\Install.ps1 -SkipTests
+```
+
+### Manual Installation from Source
 
 1. Clone the repository:
    ```powershell
-   git clone https://github.com/yourusername/PSDynaTab.git
+   git clone https://github.com/jschell/PSDynaTab.git
    cd PSDynaTab
    ```
 
@@ -54,20 +85,15 @@ Disconnect-DynaTab
    .\Build.ps1
    ```
 
-3. Import the module:
+3. Copy module to PowerShell modules directory:
    ```powershell
-   Import-Module .\PSDynaTab\PSDynaTab.psd1
+   Copy-Item -Recurse .\PSDynaTab "$env:USERPROFILE\Documents\PowerShell\Modules\"
    ```
 
-### Installing to PowerShell Modules Path
-
-```powershell
-# Copy to user modules directory
-Copy-Item -Recurse .\PSDynaTab "$env:USERPROFILE\Documents\PowerShell\Modules\"
-
-# Import module
-Import-Module PSDynaTab
-```
+4. Import the module:
+   ```powershell
+   Import-Module PSDynaTab
+   ```
 
 ## Available Commands
 
@@ -146,6 +172,7 @@ PSDynaTab/
 │       ├── EXAMPLES.md
 │       └── TROUBLESHOOTING.md
 ├── Build.ps1                       # Build script
+├── Install.ps1                     # Installation script
 ├── LICENSE                         # MIT License
 └── README.md                       # This file
 ```
