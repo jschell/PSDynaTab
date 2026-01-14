@@ -1,0 +1,33 @@
+# HidSharp DLL (will be downloaded by Build.ps1)
+PSDynaTab/lib/HidSharp.dll
+
+# Build artifacts
+*.nupkg
+*.zip
+
+# PowerShell
+*.ps1xml
+
+# Test results
+TestResults/
+*.trx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+._*
+
+# Temporary files
+*.tmp
+*.temp
+*.log
