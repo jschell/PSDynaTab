@@ -77,6 +77,10 @@ function Set-DynaTabText {
                     Send-FeaturePacket -Packet $packet -Stream $script:HIDStream
                 }
 
+                # CRITICAL: Device needs time to render image before next operation
+                # Without this delay, rapid successive calls will clear display before render completes
+                Start-Sleep -Milliseconds 100
+
                 Write-Verbose "Text sent successfully ($($packets.Count) packets)"
 
             } catch {

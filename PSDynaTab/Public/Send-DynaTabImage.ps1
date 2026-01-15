@@ -98,6 +98,10 @@ function Send-DynaTabImage {
                     Write-Progress -Activity "Sending image to DynaTab" -Completed
                 }
 
+                # CRITICAL: Device needs time to render image before next operation
+                # Without this delay, rapid successive calls will clear display before render completes
+                Start-Sleep -Milliseconds 100
+
                 Write-Verbose "Image sent successfully ($($packets.Count) packets)"
 
                 if ($PassThru -and $PSCmdlet.ParameterSetName -eq 'Image') {
