@@ -66,6 +66,12 @@ function Send-DynaTabImage {
                     ConvertTo-PixelData -Image $Image
                 }
 
+                # CRITICAL: Device requires reinitialization before each send
+                # Send init packet to prepare device for new image data
+                Write-Verbose "Reinitializing device for image send..."
+                Send-FeaturePacket -Packet $script:FIRST_PACKET -Stream $script:HIDStream
+                Start-Sleep -Milliseconds 10
+
                 # Chunk into packets
                 $packets = New-PacketChunk -PixelData $pixelData
 
