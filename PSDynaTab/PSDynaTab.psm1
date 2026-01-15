@@ -125,5 +125,6 @@ Export-ModuleMember -Function @(
     'Set-DynaTabText',
     'Clear-DynaTab',
     'Test-DynaTabConnection',
-    'Get-DynaTabDevice'
+    'Get-DynaTabDevice',
+    'Show-DynaTabSpinner'
 )
