@@ -49,6 +49,11 @@ function Connect-DynaTab {
         # Note: Proof-of-work PowerShell script works WITHOUT handshake
         # Python implementation uses get_feature_report() but PowerShell doesn't need it
 
+        # Allow device to initialize (proof-of-work uses 10ms total)
+        # Send-FeaturePacket already waited 5ms, wait additional 10ms for safety
+        Start-Sleep -Milliseconds 10
+        Write-Verbose "Device initialization complete"
+
         $script:DeviceConnected = $true
 
         Write-Host "✓ Connected to DynaTab 75X" -ForegroundColor Green
