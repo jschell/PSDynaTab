@@ -46,17 +46,8 @@ function Connect-DynaTab {
         Write-Verbose "Sending initialization packet..."
         Send-FeaturePacket -Packet $script:FIRST_PACKET -Stream $script:HIDStream
 
-        # Perform handshake (get_feature_report) - critical for device to accept subsequent data
-        Write-Verbose "Performing device handshake..."
-        $handshakeBuffer = New-Object byte[] 65
-        $handshakeBuffer[0] = 0x00  # Report ID
-
-        try {
-            $bytesRead = $script:HIDStream.GetFeature($handshakeBuffer)
-            Write-Verbose "Handshake complete, received $bytesRead bytes"
-        } catch {
-            Write-Warning "Handshake failed, but continuing: $($_.Exception.Message)"
-        }
+        # Note: Proof-of-work PowerShell script works WITHOUT handshake
+        # Python implementation uses get_feature_report() but PowerShell doesn't need it
 
         $script:DeviceConnected = $true
 
