@@ -58,6 +58,21 @@ try {
     throw "Failed to load HidSharp.dll: $($_.Exception.Message)"
 }
 
+# Load bitmap font
+$fontPath = Join-Path $PSScriptRoot 'Fonts\CP437-5x7.ps1'
+if (Test-Path $fontPath) {
+    try {
+        $script:DEFAULT_FONT = . $fontPath
+        Write-Verbose "Loaded CP437-5x7 bitmap font"
+    } catch {
+        Write-Warning "Failed to load bitmap font: $($_.Exception.Message)"
+        $script:DEFAULT_FONT = $null
+    }
+} else {
+    Write-Warning "Bitmap font not found at: $fontPath"
+    $script:DEFAULT_FONT = $null
+}
+
 # Import private functions (helpers, not exported)
 $privateFunctions = Get-ChildItem -Path "$PSScriptRoot\Private\*.ps1" -ErrorAction SilentlyContinue
 foreach ($function in $privateFunctions) {
