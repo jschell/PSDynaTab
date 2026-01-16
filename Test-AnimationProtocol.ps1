@@ -28,12 +28,21 @@ param(
     [switch]$TestAll = $true
 )
 
-# Import PSDynaTab module
-$ModulePath = Join-Path $PSScriptRoot "PSDynaTab\PSDynaTab.psm1"
-if (-not (Test-Path $ModulePath)) {
-    throw "PSDynaTab module not found at: $ModulePath"
+# Load HidSharp for direct HID communication
+$hidSharpPath = Join-Path $PSScriptRoot "PSDynaTab\lib\HidSharp.dll"
+if (-not (Test-Path $hidSharpPath)) {
+    throw "HidSharp.dll not found at: $hidSharpPath"
 }
-Import-Module $ModulePath -Force
+Add-Type -Path $hidSharpPath
+
+# Device constants
+$VID = 0x3151
+$PID = 0x4015
+$INTERFACE_INDEX = 3  # MI_02
+
+# Script-level connection variables
+$script:TestHIDStream = $null
+$script:TestDevice = $null
 
 # ============================================================================
 # CONSTANTS FROM ANALYSIS
@@ -62,6 +71,70 @@ $ANIMATION_MODE_INIT_100MS = [byte[]]@(
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 )
+
+# ============================================================================
+# DEVICE CONNECTION FUNCTIONS
+# ============================================================================
+
+function Connect-TestDevice {
+    Write-Host "Connecting to DynaTab keyboard..." -ForegroundColor Yellow
+
+    try {
+        # Find all HID devices
+        $deviceList = [HidSharp.DeviceList]::Local
+        $devices = $deviceList.GetHidDevices($VID, $PID)
+
+        if ($devices.Count -eq 0) {
+            throw "DynaTab device not found (VID: 0x$($VID.ToString('X4')), PID: 0x$($PID.ToString('X4')))"
+        }
+
+        # Find the correct interface (MI_02, Usage Page 65535)
+        $targetDevice = $null
+        foreach ($dev in $devices) {
+            $path = $dev.DevicePath
+            if ($path -match "mi_0*$($INTERFACE_INDEX - 1)") {
+                $targetDevice = $dev
+                break
+            }
+        }
+
+        if (-not $targetDevice) {
+            throw "Could not find DynaTab display interface (MI_02)"
+        }
+
+        # Open device stream
+        $script:TestDevice = $targetDevice
+        $script:TestHIDStream = $targetDevice.Open()
+
+        if (-not $script:TestHIDStream) {
+            throw "Failed to open HID stream"
+        }
+
+        Write-Host "✓ Connected to $($targetDevice.GetProductName())" -ForegroundColor Green
+        Write-Host "  Device: $($targetDevice.DevicePath)" -ForegroundColor Gray
+        return $true
+    }
+    catch {
+        Write-Host "✗ Connection failed: $_" -ForegroundColor Red
+        $script:TestDevice = $null
+        $script:TestHIDStream = $null
+        return $false
+    }
+}
+
+function Disconnect-TestDevice {
+    try {
+        if ($script:TestHIDStream) {
+            $script:TestHIDStream.Close()
+            $script:TestHIDStream = $null
+        }
+        $script:TestDevice = $null
+        Write-Host "✓ Disconnected from DynaTab" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Warning: Cleanup error: $_" -ForegroundColor Yellow
+    }
+}
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -122,11 +195,7 @@ function Send-InitPacket {
     Write-Host "  Sending: $Description" -ForegroundColor Gray
 
     try {
-        # Get HIDStream from module scope
-        $module = Get-Module PSDynaTab
-        $stream = & $module { $script:HIDStream }
-
-        if (-not $stream) {
+        if (-not $script:TestHIDStream) {
             throw "Device not connected"
         }
 
@@ -134,7 +203,7 @@ function Send-InitPacket {
         $featureReport[0] = 0x00
         [Array]::Copy($Packet, 0, $featureReport, 1, $Packet.Length)
 
-        $stream.SetFeature($featureReport)
+        $script:TestHIDStream.SetFeature($featureReport)
         Start-Sleep -Milliseconds 10
         return $true
     }
@@ -146,16 +215,12 @@ function Send-InitPacket {
 
 function Get-DeviceStatus {
     try {
-        # Get HIDStream from module scope
-        $module = Get-Module PSDynaTab
-        $stream = & $module { $script:HIDStream }
-
-        if (-not $stream) {
+        if (-not $script:TestHIDStream) {
             return $null
         }
 
         $statusBuffer = New-Object byte[] 65
-        $stream.GetFeature($statusBuffer)
+        $script:TestHIDStream.GetFeature($statusBuffer)
         return $statusBuffer
     }
     catch {
@@ -197,11 +262,7 @@ function Send-AnimationDataPacket {
     $featureReport[0] = 0x00
     [Array]::Copy($packet, 0, $featureReport, 1, 64)
 
-    # Get HIDStream from module scope
-    $module = Get-Module PSDynaTab
-    $stream = & $module { $script:HIDStream }
-
-    $stream.SetFeature($featureReport)
+    $script:TestHIDStream.SetFeature($featureReport)
     Start-Sleep -Milliseconds 5
 }
 
@@ -487,9 +548,10 @@ function Main {
 
     try {
         # Connect to device
-        Write-Host "Connecting to DynaTab keyboard..." -ForegroundColor Yellow
-        Connect-DynaTab
-        Write-Host "Connected successfully!`n" -ForegroundColor Green
+        if (-not (Connect-TestDevice)) {
+            throw "Failed to connect to device"
+        }
+        Write-Host ""
 
         # Run all tests
         Test-ModeByte
@@ -533,15 +595,7 @@ function Main {
     }
     finally {
         Write-Host "`nCleaning up..." -ForegroundColor Yellow
-        try {
-            Clear-DynaTab
-            Start-Sleep -Milliseconds 200
-            Disconnect-DynaTab
-            Write-Host "Disconnected successfully" -ForegroundColor Green
-        }
-        catch {
-            Write-Host "Cleanup warning: $_" -ForegroundColor Yellow
-        }
+        Disconnect-TestDevice
     }
 }
 
