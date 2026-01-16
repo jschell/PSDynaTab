@@ -36,8 +36,8 @@ if (-not (Test-Path $hidSharpPath)) {
 Add-Type -Path $hidSharpPath
 
 # Device constants
-$VID = 0x3151
-$PID = 0x4015
+$DEVICE_VID = 0x3151
+$DEVICE_PID = 0x4015
 $INTERFACE_INDEX = 3  # MI_02
 
 # Script-level connection variables
@@ -82,10 +82,10 @@ function Connect-TestDevice {
     try {
         # Find all HID devices
         $deviceList = [HidSharp.DeviceList]::Local
-        $devices = $deviceList.GetHidDevices($VID, $PID)
+        $devices = $deviceList.GetHidDevices($DEVICE_VID, $DEVICE_PID)
 
         if ($devices.Count -eq 0) {
-            throw "DynaTab device not found (VID: 0x$($VID.ToString('X4')), PID: 0x$($PID.ToString('X4')))"
+            throw "DynaTab device not found (VID: 0x$($DEVICE_VID.ToString('X4')), PID: 0x$($DEVICE_PID.ToString('X4')))"
         }
 
         # Find the correct interface (MI_02, Usage Page 65535)
