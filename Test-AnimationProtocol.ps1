@@ -122,7 +122,10 @@ function Send-InitPacket {
     Write-Host "  Sending: $Description" -ForegroundColor Gray
 
     try {
-        $stream = $script:HIDStream
+        # Get HIDStream from module scope
+        $module = Get-Module PSDynaTab
+        $stream = & $module { $script:HIDStream }
+
         if (-not $stream) {
             throw "Device not connected"
         }
@@ -143,7 +146,14 @@ function Send-InitPacket {
 
 function Get-DeviceStatus {
     try {
-        $stream = $script:HIDStream
+        # Get HIDStream from module scope
+        $module = Get-Module PSDynaTab
+        $stream = & $module { $script:HIDStream }
+
+        if (-not $stream) {
+            return $null
+        }
+
         $statusBuffer = New-Object byte[] 65
         $stream.GetFeature($statusBuffer)
         return $statusBuffer
@@ -187,7 +197,11 @@ function Send-AnimationDataPacket {
     $featureReport[0] = 0x00
     [Array]::Copy($packet, 0, $featureReport, 1, 64)
 
-    $script:HIDStream.SetFeature($featureReport)
+    # Get HIDStream from module scope
+    $module = Get-Module PSDynaTab
+    $stream = & $module { $script:HIDStream }
+
+    $stream.SetFeature($featureReport)
     Start-Sleep -Milliseconds 5
 }
 
