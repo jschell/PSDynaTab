@@ -100,7 +100,7 @@ function Send-DynaTabImage {
 
                 # CRITICAL: Device needs time to render image before next operation
                 # Without this delay, rapid successive calls will clear display before render completes
-                Start-Sleep -Milliseconds 500
+                Start-Sleep -Milliseconds 200
 
                 Write-Verbose "Image sent successfully ($($packets.Count) packets)"
 

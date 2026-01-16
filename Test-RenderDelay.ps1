@@ -1,11 +1,11 @@
 # Test-RenderDelay.ps1
 # Tests if the post-render delay fix works for rapid successive calls
 
-Import-Module ./PSDynaTab/PSDynaTab.psd1 -Force
+Import-Module PSDynaTab -Force
 Connect-DynaTab
 
 Write-Host "`n=== Testing Post-Render Delay Fix ===" -ForegroundColor Cyan
-Write-Host "With 100ms internal delay in Set-DynaTabText`n"
+Write-Host "With 200ms internal delay in Set-DynaTabText`n"
 
 # Test 1: Rapid successive calls (no delay between)
 Write-Host "Test 1: Four rapid successive calls (no delay between calls)"
