@@ -158,9 +158,9 @@ Status:     0x00000000 (Success)
 
 ---
 
-### Phase 4: Sequential Data Transmission (Frames 2197-2238)
+### Phase 4: Sequential Data Transmission (Frames 2197-2298)
 
-13 data packets transmitted in sequence, each following the same pattern:
+20 data packets transmitted in sequence, each following the same pattern:
 
 | Frame | Counter | Address | Timing (ms) | Status |
 |-------|---------|---------|-------------|--------|
@@ -177,6 +177,13 @@ Status:     0x00000000 (Success)
 | 2233  | 0x000A  | 0x3893  | +4.0        | ✅ ACK |
 | 2235  | 0x000B  | 0x3892  | +3.7        | ✅ ACK |
 | 2237  | 0x000C  | 0x3891  | +5.0        | ✅ ACK |
+| 2241  | 0x000D  | 0x3890  | +3.9        | ✅ ACK |
+| 2249  | 0x000E  | 0x388F  | +2.7        | ✅ ACK |
+| 2262  | 0x000F  | 0x388E  | +3.6        | ✅ ACK |
+| 2270  | 0x0010  | 0x388D  | +3.0        | ✅ ACK |
+| 2278  | 0x0011  | 0x388C  | +2.6        | ✅ ACK |
+| 2281  | 0x0012  | 0x388B  | +2.7        | ✅ ACK |
+| 2296  | 0x0013  | 0x388A  | +4.4        | ✅ ACK |
 
 **Packet Structure Example (Frame 2197)**:
 ```
@@ -222,8 +229,8 @@ Frame  Counter  Address   Counter Δ   Address Δ
 
 **Timing Analysis**:
 - Average latency: **1.5ms per packet** (Set_Report to ACK)
-- Packet interval: **3-5ms** (matches 5ms delay in `Send-FeaturePacket.ps1`)
-- Total transmission: **~40ms for 13 packets**
+- Packet interval: **2.5-5.7ms** (average ~3.6ms, matches 5ms delay in `Send-FeaturePacket.ps1`)
+- Total transmission: **~90ms for 20 packets** (frames 2197-2296)
 
 ✅ **Timing matches PSDynaTab implementation**
 
@@ -260,8 +267,9 @@ Frame  Counter  Address   Counter Δ   Address Δ
    - **Action**: Implement optional Get_Report handshake
 
 **3. Partial Display Updates Officially Supported**
-   - Only 13 packets sent (728 bytes vs full 1620 bytes)
+   - Only 20 packets sent (1120 bytes vs full 1620 bytes)
    - Epomaker software can update specific display regions
+   - **~69% of display updated** (1120 / 1620 bytes)
    - Confirms partial updates are by design, not limitation
    - **Action**: Consider implementing `Send-DynaTabPartialImage` function
 
@@ -349,7 +357,10 @@ $Stream.GetFeature($statusBuffer)
 
 ### 🟡 LOW PRIORITY: Implement Partial Display Updates
 
-**Observation**: Official software sent only 13 packets (728 bytes) instead of full 29 packets (1620 bytes)
+**Observation**: Official software sent only 20 packets (1120 bytes) instead of full 29 packets (1620 bytes)
+- **69% partial update** - Only updating changed portion of display
+- Saves 9 packets and ~35ms transmission time
+- Efficient for incremental changes (scrolling, animations, status updates)
 
 **Current Limitation**: PSDynaTab always sends full 60×9 display
 
