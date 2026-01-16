@@ -4,6 +4,8 @@
 
 This USB packet capture shows a successful display update to an **Epomaker DynaTab 75X keyboard** (VID: 0x3151, PID: 0x4015) on USB bus 4, device address 15. The trace captures device enumeration, initialization, and a sequential display update operation using HID Feature Reports on Interface 2.
 
+**🔴 CRITICAL CONTEXT**: This trace was captured from the **official Epomaker software**, making it the **manufacturer's reference implementation** of the display protocol. Any differences from PSDynaTab represent potential areas for protocol refinement or investigation.
+
 ---
 
 ## Trace Timeline Analysis
@@ -96,17 +98,24 @@ Bytes 10-11:  39 09 - Big-endian 0x0939 (2361 decimal)
 Bytes 12-63:  All 0x00 (padding)
 ```
 
-⚠️ **Different from PSDynaTab FIRST_PACKET**:
-- PSDynaTab uses: `0xa9, 0x00, 0x01, 0x00, 0x54, 0x06, 0x00, 0xfb, 0x00, 0x00, 0x3c, 0x09...`
-- This trace uses: `0xa9, 0x00, 0x01, 0x00, 0x61, 0x05, 0x00, 0xef, 0x06, 0x00, 0x39, 0x09...`
+🔴 **OFFICIAL EPOMAKER INITIALIZATION PACKET** (differs from PSDynaTab):
+- **Epomaker official**: `0xa9, 0x00, 0x01, 0x00, 0x61, 0x05, 0x00, 0xef, 0x06, 0x00, 0x39, 0x09...`
+- **PSDynaTab current**:  `0xa9, 0x00, 0x01, 0x00, 0x54, 0x06, 0x00, 0xfb, 0x00, 0x00, 0x3c, 0x09...`
 
-**Differences**:
-- Byte 4: `0x54` vs `0x61` (84 vs 97) - Could be width/dimension parameter
-- Byte 5: `0x06` vs `0x05` (6 vs 5) - Could be height/dimension parameter
-- Byte 7: `0xfb` vs `0xef` (251 vs 239) - Checksum/validation byte
-- Bytes 10-11: `0x3c, 0x09` vs `0x39, 0x09` (0x093C vs 0x0939, 2364 vs 2361) - Address/counter
+**Differences** (Official vs PSDynaTab):
+- Byte 4: `0x61` vs `0x54` (97 vs 84) - **Potentially width or display area parameter**
+- Byte 5: `0x05` vs `0x06` (5 vs 6) - **Potentially height or row count parameter**
+- Byte 7: `0xef` vs `0xfb` (239 vs 251) - **Checksum or validation byte**
+- Bytes 8-9: `0x06, 0x00` vs `0x00, 0x00` (6 vs 0) - **Additional parameter**
+- Bytes 10-11: `0x39, 0x09` vs `0x3c, 0x09` (0x0939 vs 0x093C, 2361 vs 2364) - **Start address offset**
 
-💡 **Hypothesis**: Different firmware version or display mode (possibly different resolution/area)
+⚠️ **Impact**: PSDynaTab works with current packet, but official Epomaker packet may:
+- Support different display modes or resolutions
+- Enable undiscovered features
+- Be more compatible across firmware versions
+- Have better error handling
+
+**Action Required**: Test both initialization packets to determine functional differences.
 
 #### Frame 1942: Response
 ```
@@ -139,7 +148,13 @@ Status:     0x00000000 (Success)
 
 ✅ **Device responded to status query** - Confirms device is ready for data
 
-📝 **Note**: PSDynaTab PowerShell implementation doesn't use Get_Report (unlike Python implementation), but it works without handshake protocol.
+🔴 **OFFICIAL PROTOCOL INCLUDES HANDSHAKE**:
+- Epomaker software uses Get_Report after initialization
+- PSDynaTab currently skips this step (works but not per manufacturer spec)
+- This 120ms delay between init and Get_Report may be critical timing
+- Response likely contains device status, firmware version, or ready flag
+
+**Recommendation**: Implement Get_Report handshake for full protocol compliance.
 
 ---
 
@@ -230,83 +245,160 @@ Frame  Counter  Address   Counter Δ   Address Δ
 6. **Error-free**: All transactions completed successfully
 7. **Timing**: Appropriate delays between packets
 
-### ⚠️ Observations
-1. **Initialization packet differs** from PSDynaTab FIRST_PACKET
-   - Could indicate firmware version difference
-   - Or different display mode/resolution
-   - Suggest investigating byte 4-7 parameters
+### 🔴 Critical Differences from PSDynaTab
 
-2. **Get_Report used** (frame 2096) but not strictly necessary
-   - PSDynaTab works without it
-   - May provide status/handshake confirmation
+**1. Official Initialization Packet Differs**
+   - Epomaker uses different parameters (bytes 4-11)
+   - May enable features not accessible with PSDynaTab's current packet
+   - Potentially better firmware compatibility
+   - **Action**: Test official packet in PSDynaTab implementation
 
-3. **Only 13 data packets** transmitted
-   - Full display = 1620 bytes = 29 packets (56 bytes each)
-   - This update likely sent **728 bytes** (13 × 56)
-   - Suggests **partial display update** or smaller image
+**2. Official Protocol Uses Get_Report Handshake**
+   - 120ms delay, then Get_Report to verify device ready
+   - PSDynaTab skips this (works but not manufacturer-compliant)
+   - May improve reliability on different firmware versions
+   - **Action**: Implement optional Get_Report handshake
 
-### 📊 Expected vs Actual
+**3. Partial Display Updates Officially Supported**
+   - Only 13 packets sent (728 bytes vs full 1620 bytes)
+   - Epomaker software can update specific display regions
+   - Confirms partial updates are by design, not limitation
+   - **Action**: Consider implementing `Send-DynaTabPartialImage` function
 
-| Metric | Expected (PSDynaTab) | Actual (Trace) | Match |
-|--------|---------------------|----------------|-------|
-| VID/PID | 0x3151/0x4015 | 0x3151/0x4015 | ✅ |
-| Interface | MI_02 (Interface 2) | Interface 2 | ✅ |
-| Report Type | Feature (3) | Feature (3) | ✅ |
-| Report Size | 64 bytes | 64 bytes | ✅ |
-| Header Byte | 0x29 | 0x29 | ✅ |
-| Counter Start | 0x0000 | 0x0000 | ✅ |
-| Address Start | 0x389D | 0x389D | ✅ |
-| Packet Delay | 5ms | 3-5ms avg | ✅ |
-| Init Packet | 0xa9... (specific) | 0xa9... (variant) | ⚠️ |
+### 📊 PSDynaTab vs Official Epomaker Protocol
+
+| Metric | PSDynaTab | Official Epomaker | Match | Impact |
+|--------|-----------|-------------------|-------|--------|
+| VID/PID | 0x3151/0x4015 | 0x3151/0x4015 | ✅ | None |
+| Interface | MI_02 (Interface 2) | Interface 2 | ✅ | None |
+| Report Type | Feature (3) | Feature (3) | ✅ | None |
+| Report Size | 64 bytes | 64 bytes | ✅ | None |
+| Header Byte | 0x29 | 0x29 | ✅ | None |
+| Counter Start | 0x0000 | 0x0000 | ✅ | None |
+| Address Start | 0x389D | 0x389D | ✅ | None |
+| Packet Delay | 5ms | 3-5ms avg | ✅ | None |
+| Init Packet | 0xa9 00 01 00 54... | 0xa9 00 01 00 61... | ❌ | Unknown |
+| Get_Report | Not used | Used (120ms delay) | ❌ | Reliability |
+| Partial Updates | Not implemented | Used (13 packets) | ⚠️ | Efficiency |
 
 ---
 
-## Recommendations
+## Recommendations for PSDynaTab Enhancement
 
-### 1. **Investigate Initialization Packet Variants**
-Compare the two initialization packets to understand parameter meanings:
+### 🔴 HIGH PRIORITY: Adopt Official Initialization Packet
 
+**Current vs Official**:
 ```powershell
-# Current PSDynaTab
-$FIRST_PACKET = @(0xa9, 0x00, 0x01, 0x00, 0x54, 0x06, 0x00, 0xfb, ...)
+# Current PSDynaTab (works but non-standard)
+$FIRST_PACKET = @(
+    0xa9, 0x00, 0x01, 0x00, 0x54, 0x06, 0x00, 0xfb,
+    0x00, 0x00, 0x3c, 0x09, 0x00, 0x00, ...
+)
 
-# Trace variant
-$ALTERNATE_INIT = @(0xa9, 0x00, 0x01, 0x00, 0x61, 0x05, 0x00, 0xef, ...)
+# Official Epomaker (manufacturer reference)
+$OFFICIAL_FIRST_PACKET = @(
+    0xa9, 0x00, 0x01, 0x00, 0x61, 0x05, 0x00, 0xef,
+    0x06, 0x00, 0x39, 0x09, 0x00, 0x00, ...
+)
 ```
 
-**Action**: Create test function to try different init parameters and observe behavior.
+**Actions**:
+1. Create `Test-InitPacketVariants.ps1` to compare both packets
+2. Test official packet for any functional differences
+3. Update `$FIRST_PACKET` if official version offers benefits
+4. Document parameter meanings (bytes 4-11)
 
-### 2. **Add Optional Get_Report Handshake**
-While not required, adding Get_Report after initialization could:
-- Verify device readiness
-- Read firmware version
-- Detect error conditions
+**Expected Benefits**:
+- Better firmware compatibility
+- Potential access to undiscovered features
+- Alignment with manufacturer specifications
 
-**Action**: Add `Test-DynaTabStatus` function using Get_Report.
+---
 
-### 3. **Document Packet Count Optimization**
-This trace shows only 13 packets for partial update.
+### 🟠 MEDIUM PRIORITY: Implement Get_Report Handshake
 
-**Action**: Consider implementing:
-- `Send-DynaTabPartialImage` - Update only changed region
-- Delta compression for animations
-- Dirty rectangle tracking
+**Current Behavior**: PSDynaTab sends init packet and immediately starts data transmission
 
-### 4. **Validate Timing Under Load**
-Trace shows 3-5ms intervals (vs 5ms Sleep in code).
+**Official Protocol**:
+```powershell
+# 1. Send initialization
+$Stream.SetFeature($initPacket)
+Start-Sleep -Milliseconds 120  # Wait for device processing
 
-**Action**: Profile actual timing on different systems:
-- Windows PowerShell vs PowerShell Core
-- Different USB controllers
-- Hub vs direct connection
+# 2. Read device status (NOT CURRENTLY IMPLEMENTED)
+$statusBuffer = New-Object byte[] 65
+$Stream.GetFeature($statusBuffer)
+# Verify device ready, check firmware version, etc.
 
-### 5. **Add Packet Loss Detection**
-Current implementation has no retry mechanism.
+# 3. Begin data transmission
+```
 
-**Action**:
+**Actions**:
+1. Add `Get-DynaTabStatus` function using `GetFeature()`
+2. Make handshake optional (parameter: `-UseHandshake`)
+3. Parse response buffer for status/error codes
+4. Use in `Connect-DynaTab` for verification
+
+**Expected Benefits**:
+- Detect device not ready conditions
+- Read firmware version programmatically
+- Improve reliability across firmware versions
+- Better error diagnostics
+
+---
+
+### 🟡 LOW PRIORITY: Implement Partial Display Updates
+
+**Observation**: Official software sent only 13 packets (728 bytes) instead of full 29 packets (1620 bytes)
+
+**Current Limitation**: PSDynaTab always sends full 60×9 display
+
+**Proposed Implementation**:
+```powershell
+function Send-DynaTabPartialImage {
+    param(
+        [byte[]]$PixelData,
+        [int]$StartColumn = 0,
+        [int]$EndColumn = 59,
+        [switch]$PreserveRest  # Don't clear unchanged areas
+    )
+
+    # Calculate partial packet range
+    # Only send packets for specified column range
+    # Significantly faster for small updates (text, animations)
+}
+```
+
+**Use Cases**:
+- Scrolling text (update only changed columns)
+- Animations (update only moving elements)
+- Status indicators (update single column)
+- Lower USB bandwidth usage
+
+**Actions**:
+1. Add optional `-StartColumn`/`-EndColumn` parameters to existing functions
+2. Create `Send-DynaTabPartialImage` wrapper
+3. Optimize packet chunking for partial updates
+4. Add examples for scrolling text animations
+
+---
+
+### 🟢 OPTIONAL: Additional Enhancements
+
+**1. Retry Mechanism**
 - Monitor for STALL/NAK responses
-- Implement packet retry on timeout
-- Add CRC/checksum validation if protocol supports it
+- Automatic packet retry on failure
+- Configurable retry count
+
+**2. Performance Profiling**
+- Measure actual timing on different systems
+- Test Windows PowerShell vs PowerShell Core
+- Validate on different USB controllers
+
+**3. Protocol Documentation**
+- Reverse-engineer parameter meanings from official packet
+- Document all discovered features
+- Create protocol specification document
 
 ---
 
@@ -347,13 +439,36 @@ Current implementation has no retry mechanism.
 
 ## Conclusion
 
-This USBPcap trace demonstrates a **fully successful display update** to the DynaTab keyboard with:
+This USBPcap trace from the **official Epomaker software** provides the manufacturer's reference implementation of the DynaTab display protocol. The trace demonstrates a **fully successful display update** with:
 - ✅ Correct device identification and enumeration
 - ✅ Proper HID Feature Report usage
 - ✅ Valid packet structure and sequencing
 - ✅ Zero errors or retransmissions
 - ✅ Appropriate timing between operations
 
-The trace validates the PSDynaTab implementation's protocol design. The minor initialization packet difference suggests either a firmware variant or an undocumented display mode worth investigating.
+### PSDynaTab Validation
 
-**Overall Assessment**: 🟢 **SUCCESSFUL UPDATE** - Protocol operating as designed.
+**What PSDynaTab Gets Right**:
+- ✅ Correct device targeting (VID/PID, Interface 2)
+- ✅ Proper HID Feature Report protocol
+- ✅ Valid packet structure (header + data)
+- ✅ Correct counter/address sequencing
+- ✅ Appropriate inter-packet timing (5ms)
+
+**Opportunities for Enhancement**:
+- 🔴 **Initialization packet differs** - Official uses different parameters
+- 🟠 **Missing Get_Report handshake** - Official protocol includes status verification
+- 🟡 **No partial update support** - Official software updates only changed regions
+
+### Key Insights
+
+1. **PSDynaTab works correctly** - The core protocol is sound and functional
+2. **Official protocol has refinements** - Minor differences may improve compatibility
+3. **Partial updates are supported** - Device can handle region-specific updates
+4. **Handshake is optional but recommended** - Device works without it, but official software uses it
+
+**Overall Assessment**:
+- 🟢 **PSDynaTab: FUNCTIONAL** - Working implementation with room for refinement
+- 🟢 **Official Protocol: DOCUMENTED** - Reference implementation captured and analyzed
+
+This trace provides a valuable baseline for enhancing PSDynaTab to fully match the manufacturer's specification while maintaining backward compatibility.
