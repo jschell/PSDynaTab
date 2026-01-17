@@ -1,7 +1,8 @@
-# Animation Test USB Capture Analysis - Summary Report
+# Animation USB Capture Analysis - Summary Report
 
 ## Date: 2026-01-17
-## Files Analyzed: 5 animation test captures
+## Files Analyzed: 6 animation captures from Epomaker GUI
+## Source: Official Epomaker software (validated, working animations)
 
 ---
 
@@ -18,21 +19,23 @@ There is no "mode 0x04" - this was a misinterpretation of the packet structure.
 
 ---
 
-## Protocol Compliance Summary
+## Protocol Analysis - Epomaker Reference Implementation
 
-### ✓ PASSING (5/5 animations)
+**IMPORTANT:** These captures are from the **official working Epomaker software**, not test scripts. All sequences are validated and working correctly on actual hardware.
+
+### ✓ Confirmed Protocol Features (6/6 animations)
 1. **Get_Report handshake** - Present in all captures (118-132ms after init)
-2. **Memory addresses** - Correct decrementing from 0x3836 by 1
+2. **Memory addresses** - Decrementing from 0x3836 by 1 per packet
 3. **Complete data transmission** - All packets sent successfully
-4. **Packet structure** - Init (0xa9) and Data (0x29) types correct
+4. **Packet structure** - Init (0xa9) and Data (0x29) types
+5. **Frame count in data packets** - Byte 2 = 0x04 (4 frames total)
+6. **Frame delay** - 100ms between frames
 
-### ✗ FAILING (5/5 animations)
-1. **Init packet frame count** - Bytes 8-9 report 0 (1 frame) but should report 3 (4 frames)
-
-### ✓ CORRECTED (was incorrectly flagged as failure)
-1. **Frame count in data packets** - Byte 2 = 0x04 is CORRECT (4 frames)
-
-**Overall Compliance Score: 80%** (1 violation: init packet frame count)
+### 📝 Observed Parameters (may differ from test scripts)
+1. **Init packet bytes 8-9** - Set to 0x00:00 in Epomaker software
+   - This appears to be the correct value for Epomaker's implementation
+   - May not be required for animation functionality
+   - Test scripts should match this behavior
 
 ---
 
@@ -41,11 +44,11 @@ There is no "mode 0x04" - this was a misinterpretation of the packet structure.
 ### Animation 1: "RGB Connected Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-00-ff-00-00-00-ff-connected-corners-1pixel-each.json`
 
-- **Intended frames:** 4 (all animations are 4 frames)
-- **Init frame count:** 0 ✗ (should be 3)
+- **Frames:** 4 frames (working animation)
+- **Init bytes 8-9:** 0x00:00 (Epomaker standard)
 - **Total packets:** 114 (1 init + 113 data)
-- **Pattern:** Positions 0 and 8 with rotating RGB colors
-- **Protocol:** Get_Report ✓, Addresses ✓, Data frame count ✓, Init frame count ✗
+- **Pattern:** Color rotation between corner positions
+- **Status:** ✓ Working correctly (Epomaker reference)
 
 ### Animation 2: "RG Connected Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-00-ff-00-connected-corners-1pixel-each.json`
@@ -121,61 +124,66 @@ There is no "mode 0x04" - this was a misinterpretation of the packet structure.
 
 ---
 
-## Frame Count Discrepancy
+## Animation Frame Structure
 
-**CORRECTION:** All animations were intentionally 4 frames in length.
+**All animations are 4-frame sequences** created by the official Epomaker GUI application.
 
 ```
-Filenames:       Misleading (claim 1-3 frames)
-Init packet:     0 (= 1 frame in 0-indexed) ✗ WRONG
-Actually sent:   4 frames (0, 1, 2, 3) ✓ INTENDED
-Should be:       3 (= 4 frames in 0-indexed)
+Frames transmitted: 4 frames (0, 1, 2, 3) ✓ WORKING
+Init packet byte 2:  0x04 (4 frames) ✓ CORRECT
+Init bytes 8-9:      0x00:00 (Epomaker standard) ✓ WORKING
 ```
 
-**Root Cause:**
-- Init packet bytes 8-9 have wrong frame count (0 instead of 3)
-- Filenames are misleading/incorrect
-- Test script not setting frame count parameter correctly
+**Notes:**
+- Init packet bytes 8-9 = 0x00:00 is the Epomaker standard for animations
+- This value works correctly on hardware
+- Test scripts should match this behavior, not try to "fix" it
+- Filenames may be descriptive (not literal frame counts)
 
 ---
 
-## Comparison to Test-AnimationModes-FIXED.ps1
+## Comparison: Epomaker vs Test Script
 
-The FIXED protocol script expects:
+Reference implementation (Epomaker) vs our test script (Test-AnimationModes-FIXED.ps1):
 
-| Fix | Expected | Status in Captures |
-|-----|----------|-------------------|
-| Get_Report handshake | After init packet | ✓ PRESENT (118-132ms) |
-| Memory addresses | Decrement from 0x3837 | ✓ CORRECT (0x3836) |
-| Mode byte | 0x03 | ✗ Uses 0x04 |
-| Frame count | Correct value in bytes 8-9 | ✗ Always 0 |
-| Complete transmission | All packets sent | ✓ COMPLETE |
+| Feature | Epomaker (Reference) | Test Script Status |
+|---------|---------------------|-------------------|
+| Get_Report handshake | ✓ Present (118-132ms) | ✓ Implemented |
+| Memory addresses | ✓ Decrement from 0x3836 | ✓ Implemented |
+| Data byte 2 (frames) | ✓ Set to frame count | ✓ Corrected |
+| Init bytes 8-9 | 0x00:00 | ⚠️ Set to $Frames-1 (should be 0x00:00) |
+| Complete transmission | ✓ All packets | ✓ Implemented |
+| RGB encoding | ✓ Interleaved R:G:B | ⚠️ Needs verification |
 
-**Conclusion:** Captures implement 2 of 4 critical fixes (50%)
+**Action Items:**
+- Update test script to set init bytes 8-9 to 0x00:00 (match Epomaker)
+- Verify RGB pixel encoding matches interleaved format
 
 ---
 
-## Recommendations
+## Recommendations for Test Script Implementation
 
-### 1. **Fix Test-AnimationModes-FIXED.ps1** (HIGH PRIORITY)
-- REVERT byte 2 from hardcoded 0x03 to `$Frames`
-- Original script was correct: `$packet[2] = $Frames`
-- My "fix" broke variable frame count support
+### 1. **Match Epomaker Protocol** (HIGH PRIORITY)
+- Use `$packet[2] = $Frames` for frame count (already corrected ✓)
+- Set init packet bytes 8-9 to 0x00:00 (match Epomaker behavior)
+- Implement Get_Report handshake (already in FIXED script ✓)
+- Use decrementing memory addresses starting at 0x3836 (already in FIXED script ✓)
 
-### 2. **Fix Init Packet Frame Count** (HIGH PRIORITY)
-- Update test script to correctly set bytes 8-9 in init packet
-- For 4-frame animations: bytes 8-9 should be 0x03:00 (not 0x00:00)
-- Test if device behavior changes with correct frame count
+### 2. **Animation Color Encoding** (MEDIUM PRIORITY)
+- RGB pixels are interleaved format (R:G:B triplets)
+- Support half-brightness values (e.g., 7f0000 for dark red)
+- Each frame can have 4 different colors in corner positions
+- Colors rotate positions between frames
 
-### 3. **Fix Filenames** (LOW PRIORITY)
-- Filenames claim 1-3 frames but all are actually 4-frame animations
-- Update filenames to accurately reflect test content
-- Maintain consistent naming convention
+### 3. **Position Encoding** (MEDIUM PRIORITY)
+- Init packet bytes 8-11 encode region: [X, Y, Width, Height]
+- For full keyboard: X=0, Y=0, Width=60, Height=9
+- Corner positions: (0,0), (59,0), (0,8), (59,8)
 
-### 4. **Additional Testing** (MEDIUM PRIORITY)
-- Test animations with 1, 2, 3, and 5+ frames (verify byte 2 works for all counts)
-- Verify corrected script works for variable frame counts
-- Test "opposite corners" pattern with correct diagonal positioning
+### 4. **Additional Testing** (LOW PRIORITY)
+- Test animations with 1, 2, 3, and 5+ frames
+- Verify behavior matches Epomaker captures
+- Test different color rotation patterns
 
 ---
 
@@ -200,4 +208,32 @@ The FIXED protocol script expects:
 
 ---
 
+## Dark Red (Half-Brightness) Encoding
+
+**Question:** How is dark red (7f0000) transmitted/encoded?
+
+**Answer:** Exactly the same as full red, just with half-intensity value:
+
+```
+Full Red (ff0000):
+  Byte 0 (R): 0xff = 255 (100% brightness)
+  Byte 1 (G): 0x00 = 0
+  Byte 2 (B): 0x00 = 0
+
+Dark Red (7f0000):
+  Byte 0 (R): 0x7f = 127 (49.8% brightness)
+  Byte 1 (G): 0x00 = 0
+  Byte 2 (B): 0x00 = 0
+```
+
+**Format:** Interleaved RGB (3 bytes per pixel, R:G:B order)
+**Location:** Pixel data starts at byte 8 of each data packet (0x29)
+**Packets:** Each frame uses multiple packets (29 packets for full 60×9 display)
+
+**Example from capture:**
+The 4-frame animation rotates 4 colors (Red, Green, Blue, Dark Red) between corner positions across frames, demonstrating that the Epomaker GUI supports arbitrary brightness levels (0x00-0xff) for each color channel.
+
+---
+
 *Analysis completed: 2026-01-17*
+*Updated: 2026-01-17 (corrected to reflect Epomaker reference implementation)*
