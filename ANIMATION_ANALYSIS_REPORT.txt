@@ -1,0 +1,288 @@
+
+================================================================================
+ANIMATION TEST USB CAPTURE ANALYSIS REPORT
+Date: 2026-01-17
+Files Analyzed: 5 animation test captures
+================================================================================
+
+EXECUTIVE SUMMARY
+-----------------
+All 5 animation captures demonstrate PARTIAL protocol compliance with some
+violations. Key finding: ALL animations use mode 0x04 instead of the expected
+mode 0x03, and report incorrect frame counts in the init packet.
+
+================================================================================
+INDIVIDUAL ANIMATION ANALYSIS
+================================================================================
+
+1. ANIMATION 1: 3-Frame (Red, Green, Blue) - Connected Corners
+   File: 2026-01-17-animation-ff-00-00-00-ff-00-00-00-ff-connected-corners-1pixel-each.json
+   
+   Protocol Compliance:
+   ✓ Get_Report handshake present (130.77 ms after init)
+   ✓ Memory addresses correct (starting 0x3836, decrementing by 1)
+   ✗ Mode byte: 0x04 (expected 0x03 for animations)
+   ✗ Frame count mismatch: Init reports 1 frame, actually sends 4 frames
+   ✓ Complete data transmission (114 packets total)
+   
+   Animation Structure:
+   - Actual frames transmitted: 4 (not 3 as filename suggests)
+   - Frame delay: 100 ms
+   - Bytes 4-5 parameter: 1620 (0x0654)
+   - Init address: 0x3c09
+   - Total data packets: 113 (after init)
+   - Packets per frame: Frame 0=29, Frame 1=29, Frame 2=26, Frame 3=29
+   
+   Pixel Patterns:
+   - Frame 0: Red (pos 0) + Green (pos 8) = 2 pixels
+   - Frame 1: Red (pos 8) + Blue (later packets) = mix
+   - Frame 2: Blue (pos 0) + Green (later packets) = mix
+   - Frame 3: Green (pos 0) + Blue (pos 8) = 2 pixels
+   - Pattern: "Connected corners" at positions 0 and 8
+   - Color sequence: Rotating red/green/blue combinations
+   
+   Comparison to FIXED Protocol:
+   - Missing: Correct mode byte (should be 0x03)
+   - Missing: Correct frame count in bytes 8-9
+   - Present: Get_Report handshake ✓
+   - Present: Decrementing memory addresses ✓
+
+--------------------------------------------------------------------------------
+
+2. ANIMATION 2: 2-Frame (Red, Green) - Connected Corners
+   File: 2026-01-17-animation-ff-00-00-00-ff-00-connected-corners-1pixel-each.json
+   
+   Protocol Compliance:
+   ✓ Get_Report handshake present (128.40 ms after init)
+   ✓ Memory addresses correct (starting 0x3836, decrementing by 1)
+   ✗ Mode byte: 0x04 (expected 0x03)
+   ✗ Frame count mismatch: Init reports 1 frame, actually sends 4 frames
+   ✓ Complete data transmission (117 packets total)
+   
+   Animation Structure:
+   - Actual frames transmitted: 4 (not 2 as filename suggests)
+   - Frame delay: 100 ms
+   - Bytes 4-5 parameter: 1620 (0x0654)
+   - Init address: 0x3c09
+   - Total data packets: 116 (after init)
+   - Packets per frame: 29 each for frames 0-3
+   
+   Pixel Patterns:
+   - Frame 0: Red (pos 0) + Green (pos 8)
+   - Frame 1: Red (pos 8) + Blue (later packets)
+   - Frame 2: Blue + Green mix
+   - Frame 3: Green only
+   - Pattern: Same "connected corners" positions (0, 8)
+   
+   Comparison to FIXED Protocol:
+   - Same violations as Animation 1
+
+--------------------------------------------------------------------------------
+
+3. ANIMATION 3: 1-Frame (Red) - Connected Corners
+   File: 2026-01-17-animation-ff-00-00-connected-corners-1pixel-each.json
+   
+   Protocol Compliance:
+   ✓ Get_Report handshake present (131.56 ms after init)
+   ✓ Memory addresses correct (starting 0x3836, decrementing by 1)
+   ✗ Mode byte: 0x04 (expected 0x03)
+   ✗ Frame count mismatch: Init reports 1 frame, actually sends 4 frames
+   ✓ Complete data transmission (117 packets total)
+   
+   Animation Structure:
+   - Actual frames transmitted: 4 (not 1 as filename suggests!)
+   - Frame delay: 100 ms
+   - Bytes 4-5 parameter: 1620 (0x0654)
+   - Init address: 0x3c09
+   - Total data packets: 116 (after init)
+   - Packets per frame: 29 each for frames 0-3
+   
+   Pixel Patterns:
+   - Frame 0: Red at positions 0 and 8
+   - Frame 1: Red (pos 8) + Green (later)
+   - Frame 2: Green
+   - Frame 3: Red + Green mix
+   - Pattern: Still uses "connected corners" but all red in frame 0
+   
+   Comparison to FIXED Protocol:
+   - Same violations as Animation 1
+
+--------------------------------------------------------------------------------
+
+4. ANIMATION 4: 1-Frame (Red) - Corners
+   File: 2026-01-17-animation-ff-00-00-corners-1pixel.json
+   
+   Protocol Compliance:
+   ✓ Get_Report handshake present (118.24 ms after init)
+   ✓ Memory addresses correct (starting 0x3836, decrementing by 1)
+   ✗ Mode byte: 0x04 (expected 0x03)
+   ✗ Frame count mismatch: Init reports 1 frame, actually sends 4 frames
+   ✓ Complete data transmission (117 packets total)
+   
+   Animation Structure:
+   - Actual frames transmitted: 4 (not 1!)
+   - Frame delay: 100 ms
+   - Bytes 4-5 parameter: 1620 (0x0654)
+   - Init address: 0x3c09
+   - Total data packets: 116 (after init)
+   - Packets per frame: 29 each for frames 0-3
+   
+   Pixel Patterns:
+   - Frame 0: Red (pos 0) - SINGLE pixel
+   - Frame 1: Red (pos 8) - SINGLE pixel
+   - Frame 2: Green
+   - Frame 3: Green
+   - Pattern: "Corners" - alternates single pixel at pos 0 and pos 8
+   - Difference from "connected": Only ONE pixel per frame instead of two
+   
+   Comparison to FIXED Protocol:
+   - Same violations as Animation 1
+
+--------------------------------------------------------------------------------
+
+5. ANIMATION 5: 1-Frame (Red) - Opposite Corners
+   File: 2026-01-17-animation-ff-00-00-opposite-corners-1pixel-each.json
+   
+   Protocol Compliance:
+   ✓ Get_Report handshake present (124.57 ms after init)
+   ✓ Memory addresses correct (starting 0x3836, decrementing by 1)
+   ✗ Mode byte: 0x04 (expected 0x03)
+   ✗ Frame count mismatch: Init reports 1 frame, actually sends 4 frames
+   ✓ Complete data transmission (117 packets total)
+   
+   Animation Structure:
+   - Actual frames transmitted: 4 (not 1!)
+   - Frame delay: 100 ms
+   - Bytes 4-5 parameter: 1620 (0x0654)
+   - Init address: 0x3c09
+   - Total data packets: 116 (after init)
+   - Packets per frame: 29 each for frames 0-3
+   
+   Pixel Patterns:
+   - Frame 0: Red (pos 0) + Green (pos 8) - Note: Green, not red!
+   - Frame 1: Red (pos 8) + Green (pos ?)
+   - Frame 2: Red (pos 0) + Green (pos 8)
+   - Frame 3: Red (pos 8) + Green (pos ?)
+   - Pattern: Alternating pattern between two positions
+   - All frames identical in structure (red + green at same positions)
+   
+   Comparison to FIXED Protocol:
+   - Same violations as Animation 1
+
+================================================================================
+CROSS-ANIMATION COMPARISON
+================================================================================
+
+Common Protocol Parameters (ALL 5 animations):
+- Init packet type: 0xa9 ✓
+- Data packet type: 0x29 ✓
+- Mode byte: 0x04 (VIOLATION - should be 0x03)
+- Frame delay: 100 ms
+- Bytes 4-5: 1620 (0x0654)
+- Init address: 0x3c09
+- Starting data address: 0x3836
+- Memory address behavior: Decrementing by 1 ✓
+- Get_Report handshake: Present in all ✓
+- Get_Report timing: 118-132 ms after init ✓
+
+Protocol Violations (ALL 5):
+1. Mode byte is 0x04 instead of 0x03
+2. Frame count in init packet (bytes 8-9) reports 0 (1 frame actual)
+   but all animations send 4 frames of data
+3. Filename frame counts don't match actual transmitted frames
+
+Animation Pattern Differences:
+- "Connected Corners": Positions 0 and 8 simultaneously
+- "Corners": Single pixel alternating between positions 0 and 8
+- "Opposite Corners": Confusing - appears similar to "connected corners"
+
+Frame Count Discrepancy:
+- All filenames suggest 1-3 frames
+- Init packets all report frame_count=0 (1 actual frame)
+- ALL captures actually transmit 4 frames (frames 0, 1, 2, 3)
+- This suggests the test script may have a bug or the device ignores
+  the frame count parameter and uses a default of 4 frames
+
+Color Distribution:
+- Animation 1: Mix of red, green, and blue across frames
+- Animation 2: Red, green, and blue (less blue than #1)
+- Animation 3: Primarily red and green
+- Animation 4: Red and green only, single pixels
+- Animation 5: Red and green only, same pattern all frames
+
+================================================================================
+COMPARISON TO Test-AnimationModes-FIXED.ps1
+================================================================================
+
+Expected Protocol (from FIXED script):
+1. Init packet with mode 0x03 ✓ in spec, ✗ in captures (uses 0x04)
+2. Get_Report handshake after init ✓ PRESENT in all captures
+3. Decrementing memory addresses ✓ PRESENT in all captures
+4. Frame count in bytes 8-9 (0-indexed) ✓ in spec, ✗ in captures (wrong count)
+5. Inter-packet delay 2-5ms ✓ appears correct in captures
+
+Fixes Applied in Test Script (Status in Captures):
+✓ FIX #1: Get_Report handshake - PRESENT in all 5 captures
+✓ FIX #2: Decrementing memory addresses - CORRECT in all 5 captures
+✗ FIX #3: Frame count parameter - INCORRECT in all captures
+✓ FIX #4: Complete data transmission - All packets sent
+✗ Mode byte - Uses 0x04 instead of 0x03
+
+Conclusion: Captures use OLDER protocol version or different mode!
+
+================================================================================
+CRITICAL FINDINGS
+================================================================================
+
+1. MODE BYTE DISCREPANCY
+   - Expected: 0x03 (from FIXED script, for animation mode)
+   - Actual: 0x04 (in ALL 5 captures)
+   - Impact: May indicate different mode/protocol version
+   - Hypothesis: Mode 0x04 might be "picture mode" not "animation mode"
+
+2. FRAME COUNT VIOLATION
+   - Init packet reports: 1 frame (bytes 8-9 = 0x00)
+   - Actual transmission: 4 frames in all captures
+   - Impact: Device may ignore init frame count and default to 4 frames
+   - Hypothesis: This could be a firmware limitation or test script bug
+
+3. FILENAME MISMATCH
+   - Filenames claim: 1-frame, 2-frame, 3-frame animations
+   - Reality: ALL send 4 frames of data
+   - Hypothesis: Test script may not be correctly implementing the
+     frame count, or USB capture occurred during wrong test
+
+4. PROTOCOL COMPLIANCE SCORE
+   Per animation (out of 4 key requirements):
+   - Get_Report handshake: 5/5 ✓
+   - Memory addressing: 5/5 ✓
+   - Correct mode byte: 0/5 ✗
+   - Correct frame count: 0/5 ✗
+   Overall: 50% compliance with FIXED protocol
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+1. Investigate mode 0x04 vs 0x03:
+   - Check if mode 0x04 is valid for animations
+   - Review device firmware documentation
+   - Test if mode 0x03 works with these captures
+
+2. Fix frame count initialization:
+   - Update test script to correctly set bytes 8-9 in init packet
+   - Verify device respects frame count parameter
+   - Test if device has 4-frame limitation
+
+3. Verify test execution:
+   - Re-run tests to ensure captures match intended test parameters
+   - Confirm filename matches actual animation being tested
+
+4. Additional testing needed:
+   - Capture animation with mode 0x03 to compare
+   - Capture true 1-frame, 2-frame, 3-frame animations with correct init
+   - Test if device can support >4 frames
+
+================================================================================
+END OF REPORT
+================================================================================
