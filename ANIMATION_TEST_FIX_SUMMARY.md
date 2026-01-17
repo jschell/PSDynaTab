@@ -7,6 +7,23 @@
 
 ---
 
+## ⚠️ CORRECTION (2026-01-17)
+
+**FIX #3 was INCORRECT:** Byte 2 is the total frame count, NOT a mode byte!
+
+- **Original script:** `$packet[2] = $Frames` ✓ **WAS CORRECT**
+- **My "fix":** `$packet[2] = 0x03` ✗ **WAS WRONG** (broke variable frame support)
+- **Corrected:** Reverted to `$packet[2] = $Frames` in updated FIXED script
+
+The original script was right about byte 2. The actual critical fixes were:
+1. Adding Get_Report handshake
+2. Adding memory address (bytes 6-7) with decrementing
+3. Sending complete 27 packets
+
+Frame count in init packet (bytes 8-9) may or may not be required.
+
+---
+
 ## Executive Summary
 
 All animation tests failed because the test script had **three critical protocol violations**:
