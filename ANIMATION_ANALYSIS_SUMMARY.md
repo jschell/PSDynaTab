@@ -5,18 +5,16 @@
 
 ---
 
-## CRITICAL DISCOVERY: Unknown Mode 0x04
+## DISCOVERY: Byte 2 is Frame Count, Not Mode
 
-**The animation captures use MODE 0x04, which is neither picture nor animation mode!**
+**CORRECTION:** Byte 2 in data packets is the **total frame count**, not a mode byte!
 
-- **Picture mode (from picture tests):** 0x01
-- **Animation mode (from FIXED script):** 0x03
-- **Mode used in ALL 5 captures:** **0x04** ← UNDOCUMENTED MODE
+- **Picture tests:** Byte 2 = 0x01 (1 frame = static picture)
+- **Animation tests:** Byte 2 = 0x04 (4 frames total)
+- **Original test script:** `$packet[2] = $Frames` ✓ CORRECT
+- **My "fixed" script:** `$packet[2] = 0x03` ✗ WRONG (hardcoded to 3)
 
-This suggests either:
-1. A new/experimental mode was being tested
-2. The test script has a bug setting the wrong mode
-3. Mode 0x04 is a variant of animation or picture mode
+There is no "mode 0x04" - this was a misinterpretation of the packet structure.
 
 ---
 
@@ -29,10 +27,12 @@ This suggests either:
 4. **Packet structure** - Init (0xa9) and Data (0x29) types correct
 
 ### ✗ FAILING (5/5 animations)
-1. **Mode byte** - Uses 0x04 instead of expected 0x03
-2. **Frame count** - Init reports 0 (1 frame) but should report 3 (4 frames)
+1. **Init packet frame count** - Bytes 8-9 report 0 (1 frame) but should report 3 (4 frames)
 
-**Overall Compliance Score: 60%** (2 violations, filenames are misleading)
+### ✓ CORRECTED (was incorrectly flagged as failure)
+1. **Frame count in data packets** - Byte 2 = 0x04 is CORRECT (4 frames)
+
+**Overall Compliance Score: 80%** (1 violation: init packet frame count)
 
 ---
 
@@ -45,7 +45,7 @@ This suggests either:
 - **Init frame count:** 0 ✗ (should be 3)
 - **Total packets:** 114 (1 init + 113 data)
 - **Pattern:** Positions 0 and 8 with rotating RGB colors
-- **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
+- **Protocol:** Get_Report ✓, Addresses ✓, Data frame count ✓, Init frame count ✗
 
 ### Animation 2: "RG Connected Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-00-ff-00-connected-corners-1pixel-each.json`
@@ -54,7 +54,7 @@ This suggests either:
 - **Init frame count:** 0 ✗ (should be 3)
 - **Total packets:** 117 (1 init + 116 data)
 - **Pattern:** Positions 0 and 8 with red, green, blue mix
-- **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
+- **Protocol:** Get_Report ✓, Addresses ✓, Data frame count ✓, Init frame count ✗
 
 ### Animation 3: "Red Connected Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-connected-corners-1pixel-each.json`
@@ -63,7 +63,7 @@ This suggests either:
 - **Init frame count:** 0 ✗ (should be 3)
 - **Total packets:** 117 (1 init + 116 data)
 - **Pattern:** Positions 0 and 8 with red and green
-- **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
+- **Protocol:** Get_Report ✓, Addresses ✓, Data frame count ✓, Init frame count ✗
 
 ### Animation 4: "Red Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-corners-1pixel.json`
@@ -73,7 +73,7 @@ This suggests either:
 - **Total packets:** 117 (1 init + 116 data)
 - **Pattern:** SINGLE pixel alternating between positions 0 and 8
 - **Difference:** Only one pixel per frame (vs two in "connected corners")
-- **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
+- **Protocol:** Get_Report ✓, Addresses ✓, Data frame count ✓, Init frame count ✗
 
 ### Animation 5: "Red Opposite Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-opposite-corners-1pixel-each.json`
@@ -82,7 +82,7 @@ This suggests either:
 - **Init frame count:** 0 ✗ (should be 3)
 - **Total packets:** 117 (1 init + 116 data)
 - **Pattern:** Red + Green at same positions across all frames
-- **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
+- **Protocol:** Get_Report ✓, Addresses ✓, Data frame count ✓, Init frame count ✗
 
 ---
 
@@ -111,7 +111,7 @@ This suggests either:
 |-----------|-------|--------|
 | Init packet type | 0xa9 | ✓ |
 | Data packet type | 0x29 | ✓ |
-| Mode byte | 0x04 | ✗ (expected 0x03) |
+| Data byte 2 (frame count) | 0x04 (4 frames) | ✓ CORRECT |
 | Frame delay | 100 ms | ✓ |
 | Bytes 4-5 | 1620 (0x0654) | ? |
 | Init address | 0x3c09 | ✓ |
@@ -157,15 +157,12 @@ The FIXED protocol script expects:
 
 ## Recommendations
 
-### 1. **Investigate Mode 0x04** (HIGH PRIORITY)
-- Determine if mode 0x04 is:
-  - Valid animation mode variant
-  - Picture mode variant  
-  - Experimental/undocumented mode
-  - Test script bug
-- Compare behavior with mode 0x03
+### 1. **Fix Test-AnimationModes-FIXED.ps1** (HIGH PRIORITY)
+- REVERT byte 2 from hardcoded 0x03 to `$Frames`
+- Original script was correct: `$packet[2] = $Frames`
+- My "fix" broke variable frame count support
 
-### 2. **Fix Frame Count in Init Packet** (HIGH PRIORITY)
+### 2. **Fix Init Packet Frame Count** (HIGH PRIORITY)
 - Update test script to correctly set bytes 8-9 in init packet
 - For 4-frame animations: bytes 8-9 should be 0x03:00 (not 0x00:00)
 - Test if device behavior changes with correct frame count
@@ -176,9 +173,9 @@ The FIXED protocol script expects:
 - Maintain consistent naming convention
 
 ### 4. **Additional Testing** (MEDIUM PRIORITY)
-- Capture animations with mode 0x03 to compare with mode 0x04
-- Test true 1-frame, 2-frame, 3-frame animations (not just 4)
-- Verify "opposite corners" pattern works correctly (should be diagonal)
+- Test animations with 1, 2, 3, and 5+ frames (verify byte 2 works for all counts)
+- Verify corrected script works for variable frame counts
+- Test "opposite corners" pattern with correct diagonal positioning
 
 ---
 
@@ -189,15 +186,17 @@ The FIXED protocol script expects:
 
 ---
 
-## Mode Reference Table
+## Packet Byte 2 Reference
 
-| Mode | Purpose | Source |
-|------|---------|--------|
-| 0x01 | Picture Mode | 2026-01-17 picture tests |
-| 0x03 | Animation Mode | Test-AnimationModes-FIXED.ps1 |
-| 0x04 | **UNKNOWN** | 2026-01-17 animation captures |
+**CORRECTED:** Byte 2 is the total frame count, not a mode identifier.
 
-**Mystery:** What is mode 0x04? This requires investigation.
+| Byte 2 Value | Meaning | Source |
+|--------------|---------|--------|
+| 0x01 | 1 frame (static picture) | 2026-01-17 picture tests |
+| 0x03 | 3 frames | Test-AnimationModes-FIXED.ps1 (before correction) |
+| 0x04 | 4 frames | 2026-01-17 animation captures |
+
+**Original script was correct:** `$packet[2] = $Frames`
 
 ---
 

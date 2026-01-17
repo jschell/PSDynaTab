@@ -96,7 +96,7 @@ function Send-AnimationInit {
 
     $packet = New-Object byte[] 64
     $packet[0] = 0xa9
-    $packet[2] = 0x03  # Mode 0x03 for animations
+    $packet[2] = $Frames  # Total number of frames in animation
     $packet[3] = $DelayMS
 
     # Bytes 4-5: Test parameter (big-endian)
@@ -146,7 +146,7 @@ function Send-DataPacket {
     $packet = New-Object byte[] 64
     $packet[0] = 0x29
     $packet[1] = $FrameIndex
-    $packet[2] = 0x03  # Mode 0x03
+    $packet[2] = $Frames  # Total number of frames in animation
     $packet[3] = $DelayMS
     $packet[4] = $Counter
     $packet[5] = 0x00  # Reserved
