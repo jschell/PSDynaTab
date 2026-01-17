@@ -422,3 +422,39 @@ b8 27 27 b8 27 27 b8 27 27 b8 27 27 b8 27 27 00
 **Trace Source:** Official Epomaker Software
 **Device:** DynaTab 75X (VID: 0x3151, PID: 0x4015, Interface 2)
 **Animation:** 3 frames, 100ms delay, looping
+
+---
+
+## ✓ HARDWARE VALIDATION (2026-01-16)
+
+**All core assumptions validated on actual hardware using Test-AnimationProtocol.ps1**
+
+### Confirmed Discoveries
+
+| Assumption | Status | Test Evidence |
+|------------|--------|---------------|
+| Animation mode (0x03) | ✓ **CONFIRMED** | Device accepts and processes mode byte |
+| Frame delay (byte 3) | ✓ **CONFIRMED** | 50ms, 100ms, 200ms all accepted |
+| Continuous packet stream | ✓ **CONFIRMED** | 27 packets, addresses 0x3837→0x381D |
+| Sparse frames (9 packets) | ✓ **CONFIRMED** | Visual output correct, 67.6% faster |
+| Device-controlled looping | ✓ **CONFIRMED** | Animation loops indefinitely |
+| 3-frame splitting | ✓ **CONFIRMED** | 3 distinct visual frames from 27 packets |
+
+### Visual Confirmation
+
+Animation displayed successfully with 3 frames:
+- **Frame 1:** Solid white pattern
+- **Frame 2:** Red/green/blue checkerboard with unlit areas
+- **Frame 3:** Mostly white with red line on right side
+- **Loop behavior:** Continuous looping at ~100ms per frame
+
+### Performance Metrics
+
+- **Sparse animation (27 packets):** 478ms transmission
+- **Full animation (87 packets):** 1474ms transmission
+- **Performance gain:** 67.6% faster with sparse frames
+- **Frame timing:** ~100ms per frame (visual confirmation)
+
+**See TEST_RESULTS_ANIMATION.md for complete validation details.**
+
+---
