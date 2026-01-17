@@ -30,57 +30,56 @@ This suggests either:
 
 ### ✗ FAILING (5/5 animations)
 1. **Mode byte** - Uses 0x04 instead of expected 0x03
-2. **Frame count** - Init reports 1 frame but sends 4 frames
-3. **Filename accuracy** - Claims 1-3 frames but all send 4 frames
+2. **Frame count** - Init reports 0 (1 frame) but should report 3 (4 frames)
 
-**Overall Compliance Score: 50%** (2 critical violations)
+**Overall Compliance Score: 60%** (2 violations, filenames are misleading)
 
 ---
 
 ## Individual Animation Results
 
-### Animation 1: "3-Frame (Red, Green, Blue) - Connected Corners"
+### Animation 1: "RGB Connected Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-00-ff-00-00-00-ff-connected-corners-1pixel-each.json`
 
-- **Claimed frames:** 3 (red, green, blue)
-- **Actual frames sent:** 4
+- **Intended frames:** 4 (all animations are 4 frames)
+- **Init frame count:** 0 ✗ (should be 3)
 - **Total packets:** 114 (1 init + 113 data)
 - **Pattern:** Positions 0 and 8 with rotating RGB colors
 - **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
 
-### Animation 2: "2-Frame (Red, Green) - Connected Corners"  
+### Animation 2: "RG Connected Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-00-ff-00-connected-corners-1pixel-each.json`
 
-- **Claimed frames:** 2 (red, green)
-- **Actual frames sent:** 4
+- **Intended frames:** 4 (all animations are 4 frames)
+- **Init frame count:** 0 ✗ (should be 3)
 - **Total packets:** 117 (1 init + 116 data)
 - **Pattern:** Positions 0 and 8 with red, green, blue mix
 - **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
 
-### Animation 3: "1-Frame (Red) - Connected Corners"
+### Animation 3: "Red Connected Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-connected-corners-1pixel-each.json`
 
-- **Claimed frames:** 1 (red only)
-- **Actual frames sent:** 4
+- **Intended frames:** 4 (all animations are 4 frames)
+- **Init frame count:** 0 ✗ (should be 3)
 - **Total packets:** 117 (1 init + 116 data)
 - **Pattern:** Positions 0 and 8 with red and green
 - **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
 
-### Animation 4: "1-Frame (Red) - Corners"
+### Animation 4: "Red Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-corners-1pixel.json`
 
-- **Claimed frames:** 1 (red only)
-- **Actual frames sent:** 4
+- **Intended frames:** 4 (all animations are 4 frames)
+- **Init frame count:** 0 ✗ (should be 3)
 - **Total packets:** 117 (1 init + 116 data)
 - **Pattern:** SINGLE pixel alternating between positions 0 and 8
 - **Difference:** Only one pixel per frame (vs two in "connected corners")
 - **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
 
-### Animation 5: "1-Frame (Red) - Opposite Corners"
+### Animation 5: "Red Opposite Corners" (4 frames)
 **File:** `2026-01-17-animation-ff-00-00-opposite-corners-1pixel-each.json`
 
-- **Claimed frames:** 1 (red only)
-- **Actual frames sent:** 4
+- **Intended frames:** 4 (all animations are 4 frames)
+- **Init frame count:** 0 ✗ (should be 3)
 - **Total packets:** 117 (1 init + 116 data)
 - **Pattern:** Red + Green at same positions across all frames
 - **Protocol:** Get_Report ✓, Addresses ✓, Mode ✗, Frame count ✗
@@ -124,18 +123,19 @@ This suggests either:
 
 ## Frame Count Discrepancy
 
-**The #1 Critical Issue:** All animations report wrong frame count
+**CORRECTION:** All animations were intentionally 4 frames in length.
 
 ```
-Filename says:   1, 2, or 3 frames
-Init packet:     0 (= 1 frame in 0-indexed)
-Actually sent:   4 frames (0, 1, 2, 3)
+Filenames:       Misleading (claim 1-3 frames)
+Init packet:     0 (= 1 frame in 0-indexed) ✗ WRONG
+Actually sent:   4 frames (0, 1, 2, 3) ✓ INTENDED
+Should be:       3 (= 4 frames in 0-indexed)
 ```
 
-**Hypothesis:** 
-- Device firmware may have 4-frame default/limitation
-- Test script may not be correctly setting frame count
-- Or captures were taken during wrong test execution
+**Root Cause:**
+- Init packet bytes 8-9 have wrong frame count (0 instead of 3)
+- Filenames are misleading/incorrect
+- Test script not setting frame count parameter correctly
 
 ---
 
@@ -165,20 +165,20 @@ The FIXED protocol script expects:
   - Test script bug
 - Compare behavior with mode 0x03
 
-### 2. **Fix Frame Count** (HIGH PRIORITY)
+### 2. **Fix Frame Count in Init Packet** (HIGH PRIORITY)
 - Update test script to correctly set bytes 8-9 in init packet
-- Test: Does device respect frame count or default to 4?
-- Verify: Can device support 1, 2, 3, or >4 frames?
+- For 4-frame animations: bytes 8-9 should be 0x03:00 (not 0x00:00)
+- Test if device behavior changes with correct frame count
 
-### 3. **Verify Test Execution** (MEDIUM PRIORITY)
-- Re-run animation tests with correct parameters
-- Ensure captures match intended test (1-frame should send 1 frame!)
-- Validate filename accuracy
+### 3. **Fix Filenames** (LOW PRIORITY)
+- Filenames claim 1-3 frames but all are actually 4-frame animations
+- Update filenames to accurately reflect test content
+- Maintain consistent naming convention
 
-### 4. **Additional Testing** (LOW PRIORITY)
-- Capture animations with mode 0x03 to compare
-- Test true 1-frame, 2-frame, 3-frame animations
-- Verify "opposite corners" pattern works correctly
+### 4. **Additional Testing** (MEDIUM PRIORITY)
+- Capture animations with mode 0x03 to compare with mode 0x04
+- Test true 1-frame, 2-frame, 3-frame animations (not just 4)
+- Verify "opposite corners" pattern works correctly (should be diagonal)
 
 ---
 
