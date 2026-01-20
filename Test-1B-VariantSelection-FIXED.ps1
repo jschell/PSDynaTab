@@ -70,11 +70,13 @@ function Disconnect-TestDevice {
 function Calculate-Checksum {
     param([byte[]]$Packet)
 
+    # CORRECTED algorithm: byte[7] = (0xFF - SUM(bytes[0:7])) & 0xFF
+    # Note: Use 0xFF (255), not 0x100 (256)
     $sum = 0
     for ($i = 0; $i -lt 7; $i++) {
         $sum += $Packet[$i]
     }
-    return [byte]((0x100 - $sum) -band 0xFF)
+    return [byte]((0xFF - ($sum -band 0xFF)) -band 0xFF)
 }
 
 function Send-AnimationInit {
@@ -123,7 +125,8 @@ function Send-AnimationData {
         [byte]$FrameIndex,
         [byte]$FrameCount,
         [byte]$Delay,
-        [byte]$PacketIndex,
+        [int]$PacketIndex,
+        [int]$OverallPacketCount,
         [byte[]]$ColorPattern
     )
 
@@ -132,11 +135,13 @@ function Send-AnimationData {
     $packet[1] = $FrameIndex
     $packet[2] = $FrameCount
     $packet[3] = $Delay
-    $packet[4] = $PacketIndex
-    $packet[5] = 0x00
 
-    # Memory address (decrement from 0x3836)
-    $address = 0x3836 - $PacketIndex
+    # Incrementing counter (little-endian, per Python library)
+    $packet[4] = [byte]($OverallPacketCount -band 0xFF)
+    $packet[5] = [byte](($OverallPacketCount -shr 8) -band 0xFF)
+
+    # Memory address - decrement from base (big-endian, per Python library)
+    $address = 0x3861 - $OverallPacketCount  # Python library uses 0x3861 for animations
     $packet[6] = [byte](($address -shr 8) -band 0xFF)
     $packet[7] = [byte]($address -band 0xFF)
 
@@ -187,7 +192,7 @@ function Test-AnimationVariant {
     $colorPattern = @(0xFF, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF)
 
     # Send data packets for 3 frames
-    $totalPackets = 0
+    $overallPacketCount = 0
     for ($frame = 0; $frame -lt 3; $frame++) {
         $color = $colorPattern[($frame * 3)..(($frame * 3) + 2)]
 
@@ -197,11 +202,14 @@ function Test-AnimationVariant {
                 -FrameCount 3 `
                 -Delay 100 `
                 -PacketIndex $pkt `
+                -OverallPacketCount $overallPacketCount `
                 -ColorPattern $color
 
-            $totalPackets++
+            $overallPacketCount++
         }
     }
+
+    $totalPackets = $overallPacketCount
 
     Write-Host "  Sent $totalPackets packets total ($PacketsPerFrame × 3 frames)" -ForegroundColor Green
     Write-Host ""

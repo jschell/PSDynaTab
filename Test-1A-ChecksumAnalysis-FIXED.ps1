@@ -69,12 +69,13 @@ function Disconnect-TestDevice {
 function Calculate-Checksum {
     param([byte[]]$Packet)
 
-    # Discovered algorithm: byte[7] = (0x100 - SUM(bytes[0:7])) & 0xFF
+    # CORRECTED algorithm: byte[7] = (0xFF - SUM(bytes[0:7])) & 0xFF
+    # Note: Use 0xFF (255), not 0x100 (256)
     $sum = 0
     for ($i = 0; $i -lt 7; $i++) {
         $sum += $Packet[$i]
     }
-    return [byte]((0x100 - $sum) -band 0xFF)
+    return [byte]((0xFF - ($sum -band 0xFF)) -band 0xFF)
 }
 
 function Verify-Checksum {

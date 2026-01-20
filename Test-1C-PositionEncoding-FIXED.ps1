@@ -69,12 +69,13 @@ function Disconnect-TestDevice {
 function Calculate-Checksum {
     param([byte[]]$Packet)
 
-    # Checksum = (0x100 - SUM(bytes[0:7])) & 0xFF
+    # CORRECTED algorithm: byte[7] = (0xFF - SUM(bytes[0:7])) & 0xFF
+    # Note: Use 0xFF (255), not 0x100 (256)
     $sum = 0
     for ($i = 0; $i -lt 7; $i++) {
         $sum += $Packet[$i]
     }
-    return [byte]((0x100 - $sum) -band 0xFF)
+    return [byte]((0xFF - ($sum -band 0xFF)) -band 0xFF)
 }
 
 function Send-StaticPictureInit {
@@ -125,34 +126,43 @@ function Send-StaticPictureData {
         [int]$PixelCount
     )
 
-    # Single data packet for simplicity
-    $packet = New-Object byte[] 64
-    $packet[0] = 0x29
-    $packet[1] = 0x00  # Frame index
-    $packet[2] = 0x01  # Frame count
-    $packet[3] = 0x00  # Delay
-    $packet[4] = 0x00  # Packet counter
-    $packet[5] = 0x00
+    # Calculate packets needed (18 pixels per packet max)
+    $packetsNeeded = [Math]::Ceiling($PixelCount / 18.0)
+    $baseAddress = 0x389D  # From Python library
 
-    # Memory address (from working capture)
-    $packet[6] = 0x03
-    $packet[7] = 0xd2
+    for ($pktIdx = 0; $pktIdx -lt $packetsNeeded; $pktIdx++) {
+        $packet = New-Object byte[] 64
+        $packet[0] = 0x29
+        $packet[1] = 0x00  # Frame index
+        $packet[2] = 0x01  # Frame count
+        $packet[3] = 0x00  # Delay
 
-    # Fill with pixel data (up to 18 pixels)
-    $pixelsToSend = [Math]::Min(18, $PixelCount)
-    for ($p = 0; $p -lt $pixelsToSend; $p++) {
-        $offset = 8 + ($p * 3)
-        $packet[$offset] = $R
-        $packet[$offset + 1] = $G
-        $packet[$offset + 2] = $B
+        # Incrementing counter (little-endian)
+        $packet[4] = [byte]($pktIdx -band 0xFF)
+        $packet[5] = [byte](($pktIdx -shr 8) -band 0xFF)
+
+        # Memory address - decrement from base (big-endian)
+        $address = $baseAddress - $pktIdx
+        $packet[6] = [byte](($address -shr 8) -band 0xFF)
+        $packet[7] = [byte]($address -band 0xFF)
+
+        # Fill with pixel data (up to 18 pixels per packet)
+        $pixelsRemaining = $PixelCount - ($pktIdx * 18)
+        $pixelsThisPacket = [Math]::Min(18, $pixelsRemaining)
+        for ($p = 0; $p -lt $pixelsThisPacket; $p++) {
+            $offset = 8 + ($p * 3)
+            $packet[$offset] = $R
+            $packet[$offset + 1] = $G
+            $packet[$offset + 2] = $B
+        }
+
+        # Send data packet
+        $featureReport = New-Object byte[] 65
+        [Array]::Copy($packet, 0, $featureReport, 1, 64)
+        $script:TestHIDStream.SetFeature($featureReport)
+
+        Start-Sleep -Milliseconds 2
     }
-
-    # Send data packet
-    $featureReport = New-Object byte[] 65
-    [Array]::Copy($packet, 0, $featureReport, 1, 64)
-    $script:TestHIDStream.SetFeature($featureReport)
-
-    Start-Sleep -Milliseconds 2
 }
 
 function Test-BoundingBox {
