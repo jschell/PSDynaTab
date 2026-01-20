@@ -135,8 +135,16 @@ function Send-TestInit {
     $featureReport = New-Object byte[] 65
     [Array]::Copy($packet, 0, $featureReport, 1, 64)
     $script:TestHIDStream.SetFeature($featureReport)
+    Start-Sleep -Milliseconds 5
 
-    Start-Sleep -Milliseconds 120
+    # Get_Report handshake (REQUIRED per Python library)
+    try {
+        $response = New-Object byte[] 65
+        $script:TestHIDStream.GetFeature($response)
+        Start-Sleep -Milliseconds 5
+    } catch {
+        Write-Warning "Get_Report handshake failed (may be optional)"
+    }
 
     return @{
         Checksum = $packet[7]
@@ -155,13 +163,18 @@ function Send-TestData {
 
     $packet = New-Object byte[] 64
     $packet[0] = 0x29
-    $packet[1] = 0x00
-    $packet[2] = 0x01
-    $packet[3] = 0x00
+    $packet[1] = 0x00  # Frame index
+    $packet[2] = 0x01  # Frame count
+    $packet[3] = 0x00  # Delay (static)
+
+    # Incrementing counter (little-endian)
     $packet[4] = 0x00
     $packet[5] = 0x00
-    $packet[6] = 0x03
-    $packet[7] = 0xd2
+
+    # Memory address from base (big-endian) - single packet, so use base
+    $address = 0x389D
+    $packet[6] = [byte](($address -shr 8) -band 0xFF)
+    $packet[7] = [byte]($address -band 0xFF)
 
     # Fill with pixel data
     $pixelsToSend = [Math]::Min(18, $PixelCount)
@@ -172,11 +185,14 @@ function Send-TestData {
         $packet[$offset + 2] = $B
     }
 
+    # Last packet override for single-packet static image (per Python library)
+    $packet[6] = 0x34
+    $packet[7] = 0x85
+
     $featureReport = New-Object byte[] 65
     [Array]::Copy($packet, 0, $featureReport, 1, 64)
     $script:TestHIDStream.SetFeature($featureReport)
-
-    Start-Sleep -Milliseconds 2
+    Start-Sleep -Milliseconds 5  # 5ms per Python library
 }
 
 function Test-ChecksumVariation {

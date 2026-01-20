@@ -116,8 +116,16 @@ function Send-AnimationInit {
     $featureReport = New-Object byte[] 65
     [Array]::Copy($packet, 0, $featureReport, 1, 64)
     $script:TestHIDStream.SetFeature($featureReport)
+    Start-Sleep -Milliseconds 5
 
-    Start-Sleep -Milliseconds 120
+    # Get_Report handshake (REQUIRED per Python library)
+    try {
+        $response = New-Object byte[] 65
+        $script:TestHIDStream.GetFeature($response)
+        Start-Sleep -Milliseconds 5
+    } catch {
+        Write-Warning "Get_Report handshake failed (may be optional)"
+    }
 }
 
 function Send-AnimationData {
@@ -127,6 +135,7 @@ function Send-AnimationData {
         [byte]$Delay,
         [int]$PacketIndex,
         [int]$OverallPacketCount,
+        [int]$PacketsPerFrame,
         [byte[]]$ColorPattern
     )
 
@@ -154,12 +163,17 @@ function Send-AnimationData {
         $packet[$offset + 2] = $ColorPattern[$colorIndex + 2]
     }
 
+    # Last packet override for this frame (per Python library)
+    if ($PacketIndex -eq ($PacketsPerFrame - 1)) {
+        $packet[6] = 0x34
+        $packet[7] = 0x49 - $FrameIndex  # Decrements per frame
+    }
+
     # Send data packet
     $featureReport = New-Object byte[] 65
     [Array]::Copy($packet, 0, $featureReport, 1, 64)
     $script:TestHIDStream.SetFeature($featureReport)
-
-    Start-Sleep -Milliseconds 2
+    Start-Sleep -Milliseconds 5  # 5ms per Python library
 }
 
 function Test-AnimationVariant {
@@ -203,6 +217,7 @@ function Test-AnimationVariant {
                 -Delay 100 `
                 -PacketIndex $pkt `
                 -OverallPacketCount $overallPacketCount `
+                -PacketsPerFrame $PacketsPerFrame `
                 -ColorPattern $color
 
             $overallPacketCount++

@@ -114,8 +114,16 @@ function Send-StaticPictureInit {
     $featureReport = New-Object byte[] 65
     [Array]::Copy($packet, 0, $featureReport, 1, 64)
     $script:TestHIDStream.SetFeature($featureReport)
+    Start-Sleep -Milliseconds 5
 
-    Start-Sleep -Milliseconds 120
+    # Get_Report handshake (REQUIRED per Python library)
+    try {
+        $response = New-Object byte[] 65
+        $script:TestHIDStream.GetFeature($response)
+        Start-Sleep -Milliseconds 5
+    } catch {
+        Write-Warning "Get_Report handshake failed (may be optional)"
+    }
 }
 
 function Send-StaticPictureData {
@@ -156,12 +164,17 @@ function Send-StaticPictureData {
             $packet[$offset + 2] = $B
         }
 
+        # Last packet override (per Python library)
+        if ($pktIdx -eq ($packetsNeeded - 1)) {
+            $packet[6] = 0x34
+            $packet[7] = 0x85
+        }
+
         # Send data packet
         $featureReport = New-Object byte[] 65
         [Array]::Copy($packet, 0, $featureReport, 1, 64)
         $script:TestHIDStream.SetFeature($featureReport)
-
-        Start-Sleep -Milliseconds 2
+        Start-Sleep -Milliseconds 5  # 5ms per Python library
     }
 }
 
