@@ -1,0 +1,8 @@
+"TestName","Byte10","Byte11","HypothesisA","HypothesisB","ExpectedPixels","VisiblePixels","Position","MatchesHypothesisA","MatchesHypothesisB","Timestamp"
+"1C-1_TopRow10Pixels","0x0A","0x01","Region (0,0) to (10,1) exclusive = 10×1 = 10 pixels","Region width=10, height=1 = 10 pixels","10","0","na","n","n","2026-01-19 15:54:10"
+"1C-2_TwoFullRows","0x3C","0x02","Region (0,0) to (60,2) exclusive = 60×2 = 120 pixels","Region width=60, height=2 = 120 pixels","120","0","na","n","n","2026-01-19 15:54:22"
+"1C-3_Baseline_0d09","0x0D","0x09","Region (0,0) to (13,9) exclusive = 13×9 = 117 pixels","Region width=13, height=9 = 13×9 = 117 pixels","117","0","na","n","n","2026-01-19 15:54:36"
+"1C-4_SmallRegion","0x05","0x03","Region (0,0) to (5,3) exclusive = 5×3 = 15 pixels","Region width=5, height=3 = 5×3 = 15 pixels","15","0","na","n","n","2026-01-19 15:54:48"
+"1C-5_SinglePixel","0x01","0x01","Region (0,0) to (1,1) exclusive = 1×1 = 1 pixel","Region width=1, height=1 = 1 pixel","1","0","na","n","n","2026-01-19 15:55:05"
+"1C-6_FullDisplay","0x3C","0x09","Region (0,0) to (60,9) exclusive = 60×9 = 540 pixels","Region width=60, height=9 = 60×9 = 540 pixels","540","0","na","n","n","2026-01-19 15:55:15"
+"1C-7_ZeroValues","0x00","0x00","Region (0,0) to (0,0) exclusive = 0 pixels (no display?)","Region width=0, height=0 = 0 pixels (no display?)","0","0","na","n","n","2026-01-19 15:55:27"
